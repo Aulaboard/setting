@@ -284,6 +284,79 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
+/* ---------- backup / transfer data between devices ---------- */
+function exportData(){
+  const payload = {
+    app: 'aura-board-tracker',
+    exportedAt: new Date().toISOString(),
+    orders,
+    products
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `aura-board-backup-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('ດາວໂຫຼດຂໍ້ມູນແລ້ວ ✓');
+}
+
+async function importData(file){
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    let addedOrders = 0;
+    if(Array.isArray(data.orders)){
+      const existingIds = new Set(orders.map(o => o.id));
+      data.orders.forEach(o=>{
+        if(o && o.id && !existingIds.has(o.id)){
+          orders.push(o);
+          existingIds.add(o.id);
+          addedOrders++;
+        }
+      });
+      await saveOrders();
+    }
+
+    if(Array.isArray(data.products)){
+      data.products.forEach(p=>{
+        if(!p || !p.name) return;
+        const key = p.name.trim().toLowerCase();
+        const existing = products.find(x => x.name.trim().toLowerCase() === key);
+        if(!existing){
+          products.push(p);
+        }else if((p.lastUsed||0) > (existing.lastUsed||0)){
+          existing.price = p.price;
+          existing.cost = p.cost;
+          existing.ship = p.ship;
+          existing.lastUsed = p.lastUsed;
+        }
+      });
+      saveProducts();
+    }
+
+    render();
+    renderProductChips();
+    showToast(addedOrders > 0 ? `ນຳເຂົ້າສຳເລັດ (+${addedOrders} ອໍເດີໃໝ່)` : 'ຂໍ້ມູນນີ້ມີຢູ່ໃນເຄື່ອງແລ້ວ');
+  }catch(err){
+    showToast('ໄຟລ໌ບໍ່ຖືກຕ້ອງ ລອງໃໝ່ອີກຄັ້ງ');
+  }
+}
+
+document.getElementById('exportBtn').addEventListener('click', exportData);
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(file) importData(file);
+  e.target.value = '';
+});
+
 function updateDateDisplay(){
   const val = document.getElementById('orderDate').value || todayStr();
   document.getElementById('dateDisplayText').textContent = laoDate(val);
