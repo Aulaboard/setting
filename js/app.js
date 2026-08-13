@@ -1,6 +1,9 @@
 const STORAGE_KEY = 'kb-shop-orders';
+const PRODUCTS_KEY = 'kb-shop-products';
 let orders = [];
+let products = [];
 let selectedMonth = null;
+let manageMode = false;
 
 const LAO_MONTHS = ['ມັງກອນ','ກຸມພາ','ມີນາ','ເມສາ','ພຶດສະພາ','ມິຖຸນາ','ກໍລະກົດ','ສິງຫາ','ກັນຍາ','ຕຸລາ','ພະຈິກ','ທັນວາ'];
 
@@ -55,6 +58,92 @@ async function saveOrders(){
   }
 }
 
+function loadProducts(){
+  try{
+    const raw = localStorage.getItem(PRODUCTS_KEY);
+    products = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    products = [];
+  }
+}
+function saveProducts(){
+  try{
+    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+  }catch(e){
+    showToast('ບັນທຶກສິນຄ້າບໍ່ສຳເລັດ');
+  }
+}
+function upsertProduct(name, price, cost, ship){
+  const key = name.trim().toLowerCase();
+  const existing = products.find(p => p.name.trim().toLowerCase() === key);
+  if(existing){
+    existing.price = price;
+    existing.cost = cost;
+    existing.ship = ship;
+    existing.lastUsed = Date.now();
+  }else{
+    products.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      name, price, cost, ship, lastUsed: Date.now()
+    });
+  }
+  saveProducts();
+}
+function selectProduct(p){
+  document.getElementById('itemName').value = p.name;
+  document.getElementById('priceInput').value = p.price;
+  document.getElementById('costInput').value = p.cost;
+  document.getElementById('shipInput').value = p.ship;
+  computeProfit();
+  renderProductChips(p.id);
+}
+function deleteProduct(id){
+  products = products.filter(p => p.id !== id);
+  saveProducts();
+  renderProductChips();
+  showToast('ລຶບສິນຄ້າອອກຈາກລາຍການແລ້ວ');
+}
+function renderProductChips(activeId){
+  const row = document.getElementById('productChips');
+  const empty = document.getElementById('emptyPresets');
+  if(products.length === 0){
+    row.innerHTML = '';
+    row.classList.remove('manage-mode');
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  row.classList.toggle('manage-mode', manageMode);
+  const sorted = products.slice().sort((a,b)=> (b.lastUsed||0) - (a.lastUsed||0));
+  row.innerHTML = sorted.map(p => `
+    <button type="button" class="chip product-chip ${p.id===activeId?'active':''}" data-id="${p.id}">
+      <span class="nm">${escapeHtml(p.name)}</span>
+      <span class="rm" data-del="${p.id}">✕</span>
+    </button>
+  `).join('');
+
+  row.querySelectorAll('.product-chip').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const delId = e.target.dataset.del;
+      if(delId){
+        e.stopPropagation();
+        deleteProduct(delId);
+        return;
+      }
+      if(manageMode) return;
+      const p = products.find(x => x.id === btn.dataset.id);
+      if(p) selectProduct(p);
+    });
+  });
+}
+document.getElementById('manageBtn').addEventListener('click', ()=>{
+  manageMode = !manageMode;
+  const btn = document.getElementById('manageBtn');
+  btn.textContent = manageMode ? 'ສຳເລັດ' : 'ຈັດການ';
+  btn.classList.toggle('on', manageMode);
+  renderProductChips();
+});
+
 function computeProfit(){
   const price = parseFloat(document.getElementById('priceInput').value) || 0;
   const cost = parseFloat(document.getElementById('costInput').value) || 0;
@@ -89,6 +178,10 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
   orders.push(order);
   await saveOrders();
 
+  if(name !== 'ບໍ່ລະບຸຮຸ່ນ'){
+    upsertProduct(name, price, cost, ship);
+  }
+
   document.getElementById('itemName').value = '';
   document.getElementById('priceInput').value = '';
   document.getElementById('costInput').value = '';
@@ -98,6 +191,7 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
   selectedMonth = monthKey(date);
   showToast('ບັນທຶກອໍເດີແລ້ວ ✓');
   render();
+  renderProductChips();
 });
 
 async function deleteOrder(id){
@@ -201,3 +295,5 @@ document.getElementById('orderDate').value = todayStr();
 updateDateDisplay();
 computeProfit();
 loadOrders();
+loadProducts();
+renderProductChips();
