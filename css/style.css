@@ -147,6 +147,29 @@
     box-shadow: 0 1px 0 #17161c;
   }
 
+  /* backup / data transfer */
+  .backup-hint{
+    font-size:12.5px; color:var(--ink-soft); line-height:1.5;
+    margin:0 0 14px;
+  }
+  .backup-actions{display:flex; gap:10px;}
+  .btn-secondary{
+    flex:1;
+    padding:12px 8px;
+    border-radius:11px;
+    border:1.5px solid var(--line-strong);
+    background:var(--paper-2);
+    color:var(--ink);
+    font-family:'Noto Sans Lao', sans-serif;
+    font-weight:700; font-size:13px;
+    cursor:pointer;
+    transition: background .15s ease, transform .06s ease;
+  }
+  .btn-secondary:active{
+    transform:translateY(2px);
+    background:var(--paper);
+  }
+
   /* month chips */
   .chip-row{
     display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px;
